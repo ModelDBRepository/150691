@@ -1,0 +1,68 @@
+// utility functions to convert (Nx, Ny) to gid and also the
+// gap junction indices.
+
+func loc2gid() { local gid
+	// because of different boundary conditions we want to properly
+	// handle x and y locations of -1 and Nx, and Ny respectively
+	// return -1 if the location is not in the domain
+	$1 = bndry($1, Nx, xwrap)
+	if ($1 < 0) { return -1 }
+	$2 = bndry($2, Ny, ywrap)	
+	if ($2 < 0) { return -1 }
+	return $1 + $2*Nx
+}
+func bndry() {
+	if ($3 == 1) { // wrap
+		if ($1 < -1) { return -1 }
+		if ($1 == -1) { return $2-1 }
+		if ($1 > $2) { return -1 }
+		if ($1 == $2) { return 0 }
+	}else if ($3 == 2) { // mirror
+		if ($1 < -1) { return -1 }
+		if ($1 == -1) { return 1 }
+		if ($1 > $2) { return -1 }
+		if ($1 == $2) { return $2-2 }
+	}else{ // cut
+		if ($1 < 0) { return -1 }
+		if ($1 >= $2) { return -1 }
+	}
+	return $1
+}
+func gid2ix() {
+	return $1 % Nx
+}
+func gid2iy() {
+	return int($1/Nx)
+}
+
+// each cell has 4 gap junction targets and the cell voltage is the
+// source for a target on each of the 4 adjacent cells.
+// Since the assumption is one compartment per cell we can use the
+// cell gid as the transfer srcgid. If cells become multicompartment
+// this conceptual strategy will have to drastically change.
+
+// what is the gap srcgid for a given cell location
+func gapsrcgid() {
+	return loc2gid($1, $2)
+}
+// Note that for a target (x,y) cell's HalfGaps we are interested in
+// the gapsrcgid for the four sources (x+1, y), (x-1, y), (x, y+1), (x, y-1)
+// whose global existence depends on the kind of boundary condition selected.
+
+// given a cell gid and a gap index (0-3) for the half gaps associated
+// with that cell, what is the gid of the cell
+// that provides the spike to the gap for the purpose of randomly changing
+// the conductance of the gap. Note it is critical for each side of a gap
+// to get the same spikes. Cell gid provides spikes to the left and upper
+// pair of gaps relative to that cell.
+func gapspkgid() {
+	if ($2 == 0) { // right
+		return $1
+	}else if ($2 == 1) { // upper
+		return $1
+	}else if ($2 == 1) { // left
+		return loc2gid(gid2ix($1)-1, gid2iy($1))
+	}else { // lower
+		return loc2gid(gid2ix($1), gid2iy($1)-1)
+	}
+}

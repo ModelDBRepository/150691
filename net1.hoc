@@ -1,0 +1,199 @@
+{load_file("gidfunc.hoc")}
+{load_file("distrib.hoc")}
+{load_file("cell.hoc")}
+
+objref cells
+
+proc setgid() {local i, gid
+	for pcitr(&gid, &i) {
+		pc.set_gid2node(gid, pc.id)
+	}
+}
+setgid()
+
+cells = new List()
+proc mkcells() {local i, gid  localobj cell, nc, nil
+	for pcitr(&gid, &i) {
+		cell = new Cell()
+		cell.position((cell.soma.L+5)*gid2ix(gid), (cell.soma.diam+5)*gid2iy(gid), 0)
+		cells.append(cell)
+		nc = cell.connect2target(nil)
+		pc.cell(gid, nc)
+	}
+}
+mkcells()
+
+// we added objref gaps[4] to Cell to hold its four gap junctions. The order
+// 0,1,2,3 is right, up, left, down
+
+// Gaps can be both rectifying and randomly change conductance
+// parameters. Because of rectification, HalfGaps need to know their
+// polarity since the voltage sensitive conductance depends on the
+// voltage relative to the - side. ie. for both sides, voltage is positive
+// if v(+side) - v(-side) is positive. If HalfGap.id > 0 then that is the
+// +side. Because of randomness, and because it is necessary that
+// corresponding HalfGap have identical conductance at all times. Both
+// HalfGap sides must use a Random generator which produces the same
+// stream of random numbers. We use abs(HalfGap.id) to
+// specify the Random123 stream index. Right, up HalfGaps
+// are defined to be -side (negative id) and Left, down HalfGaps are
+// +side (positive id). Left,Up ids are (1 + 2*gid) and (1 + 2*gid+1)
+// where gid is the gid of the cell of the other side of the gap.
+// Right, up HalfGaps are -(1 + 2*gid) and -(1 + 2*gid+1) where gid is the
+// gid of this cell. These ids also allow us
+// to efficiently test that conductance on both sides of a gap are identical.
+
+func gapid() {
+	if ($1 >= 0) {
+		return 1 + 2*$1 + $2
+	}else{
+		return 0 // will not be creating a gap for this id.
+	}
+}
+
+proc mkgaps() {local i, gid, ix, iy, sgid  localobj cell, r
+	r = new Random()
+	r.Random123_globalindex(ran_global)
+	if (pc.id == 0) printf("ran123 global index %d\n", r.Random123_globalindex())
+	for pcitr(&gid, &i) {
+		cell = pc.gid2cell(gid)
+	  cell.soma {
+		ix = gid2ix(gid)
+		iy = gid2iy(gid)
+		sgid = gapsrcgid(ix, iy)
+		if (sgid > -1) {// check not needed
+			pc.source_var(&cell.soma.v(.5), sgid)
+		}
+		sgid = gapsrcgid(ix+1, iy)
+		mkgap(cell, 0, sgid, -gapid(gid, 0))
+		sgid = gapsrcgid(ix, iy+1)
+		mkgap(cell, 1, sgid, -gapid(gid, 1))
+		sgid = gapsrcgid(ix-1, iy)
+		mkgap(cell, 2, sgid, gapid(sgid, 0))
+		sgid = gapsrcgid(ix, iy-1)
+		mkgap(cell, 3, sgid, gapid(sgid, 1))
+	  }
+	}
+	setallgap(ggap, gsd, drift)
+	pc.setup_transfer()
+}
+proc mkgap() {localobj gap, r
+	if ($3 > -1) {
+	    if (use_halfgapspk) {
+		gap = new HalfGapSpk(.5)
+	    }else{
+		gap = new HalfGap(.5)
+	    }
+		$o1.gaps[$2] = gap
+		pc.target_var(gap, &gap.vgap, $3)
+		gap.id = $4
+		r = new Random()
+		$o1.rand[$2] = r
+		r.Random123(abs($4), 0)
+		r.normal(1, 1)
+		gap.setRandom(r)
+	}
+}
+proc setallgap() {local gid, i, j  localobj cell, nil
+	for pcitr(&gid, &i) {
+		cell = pc.gid2cell(gid)
+		for j=0, 3 if (cell.gaps[j] != nil) {
+			cell.gaps[j].meang = $1
+			cell.gaps[j].gmax = $1
+			cell.gaps[j].gmin = $1
+			cell.gaps[j].g = $1
+			cell.gaps[j].rg = $2
+			cell.gaps[j].drift=$3
+		}
+	}
+}
+
+objref _nclist
+_nclist = new List()
+
+proc setup_halfgapspk() {local gid, i, j, spkgid  localobj cell, nil, nc
+	if (!use_halfgapspk) { return }
+	for pcitr(&gid, &i) {
+		pc.threshold(gid, -20)
+		cell = pc.gid2cell(gid)
+		for j=0, 3 if (cell.gaps[j] != nil) if (cell.gaps[j].rg > 0) {
+			spkgid = gapspkgid(gid, j)
+			if (spkgid > -1) {
+				nc = pc.gid_connect(spkgid, cell.gaps[j])
+				_nclist.append(nc)
+			}
+		}
+	}
+}
+
+// 9 args are (i,j) position, direction (0,1,2,3 means 
+// right, bottom, left, top),  gmin,gmax conductance (nS),
+// variance of gmax, mean time to change gmax, variance of the time, drift.
+// Note that if gmin is 0 it will stay at 0, otherwise it will track gmax.
+// Typically, the direction will be 0 or 1, and 2, 3 will be set automatically.
+proc setgap() {local i, j, dir
+	sethalfgap($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	i=$1
+	j=$2
+	if ($3 == 0)       { i += 1  dir=2
+	}else if ($3 == 1) { j += 1  dir=3
+	}else if ($3 == 2) { i -= 1  dir=0
+	}else              { j -= 1  dir=1 }
+	sethalfgap(i, j, dir, $4, $5, $6, $7, $8, $9)
+}
+
+proc sethalfgap() {local gid  localobj cell, nil, gap
+printf("sethalfgap %d %d %d %g %g %g %g %g %g\n", $1, $2, $3, $4, $5, $6, $7, $8, $9)
+	gid = gapsrcgid($1, $2)
+	if (pc.gid_exists(gid)) {
+		cell = pc.gid2cell(gid)
+		gap = cell.gaps[$3]
+		if (gap != nil) {
+			gap.gmin = $4
+			gap.gmax = $5
+			gap.meang = $5
+			gap.rg = $6
+			gap.meant = $7
+			gap.rt = $8
+			gap.drift = $9
+		}
+	}
+}
+
+// print the gap conductances of cell i,j
+proc pgap() {local gid, dir  localobj cell, nil
+	gid = gapsrcgid($1, $2)
+	if (pc.gid_exists(gid)) {
+		cell = pc.gid2cell(gid)
+		for dir=0, 3 {
+			if (cell.gaps[dir] != nil) {
+  printf("%d gap %d %d %d %g +/- %g\n", pc.id, $1, $2, dir, cell.gaps[dir].g, cell.gaps[dir].rg)
+			}else{
+  printf("%d gap %d %d %d ---\n", pc.id, $1, $2, dir)
+			}
+		}
+	}
+}
+
+proc mygap() {local gid, dir  localobj cell, nil
+	gid = gapsrcgid($1, $2)
+	if (pc.gid_exists(gid)) {
+		cell = pc.gid2cell(gid)
+			if (cell.gaps[$3] != nil) {
+			cell.gaps[$3].g=$4
+			cell.gaps[$3].gmax=$4
+			cell.gaps[$3].gmin=$4
+			cell.gaps[$3].meang=$4
+			cell.gaps[$3].rg=$5
+			cell.gaps[$3].drift=$6
+			cell.gaps[$3].meant=$7
+			cell.gaps[$3].rt=$8
+if (abs(cell.gaps[$3].id) == 744) {
+  print cell.gaps[$3].id, " mygap ", $1, $2, $3, $4, $5, $6, $7, $8
+}
+		}
+	}
+}
+
+
+mkgaps()

@@ -1,0 +1,76 @@
+begintime = startsw()
+objref pc
+pc = new ParallelContext()
+
+{pc.timeout(1)}
+
+{load_file("nrngui.hoc")}
+{load_file("param.hoc")}
+
+{load_file("net1.hoc")}
+//{load_file("bl2-gvar.hoc")}
+
+event_HalfGap = 1e9
+for xx = 5, 5 {
+	for yy=5, 15 {
+		for dd=0, 1 {
+//			setgap(xx, yy, dd, 0, 0, 0, 1e9, 0, 0)
+		}
+	}
+}
+
+if (use_halfgapspk) {
+	setup_halfgapspk() // must be done after rg set for all halfgaps since
+				// we only send events to a gap when rg>0
+}
+
+{load_file("stim.hoc")}
+{load_file("verifygap.hoc")}
+{load_file("parlib.hoc")}
+{load_file("spike2file.hoc")}
+want_all_spikes()
+
+{cvode.use_long_double(1)}
+{cvode_active(1)}
+
+// utile per stampare sul file di terminale il procedere della simulazione
+objref fih_progress
+if (pc.id == 0) fih_progress = new FInitializeHandler(2, "cvode.event(1000, \"progress()\")")
+proc progress() {
+	print t
+	cvode.event(t + 1000, "progress()")
+}
+
+verifyHalfGap()
+
+setuptime = startsw() - begintime
+if (pc.id == 0) { printf("setuptime %g\n", startsw() - begintime) }
+
+vrecord(2,3)
+
+prun()
+
+if (pc.id == 0) {
+	printf("spike2file_time %g\n", spike2file_time)
+	printf("trajec_out_time %g\n", trajec_out_time)
+	printf("trajec_out size %d\n", trajec_out_size)
+	printf("runtime %g\n", runtime)
+}
+
+// following two are now done at long intervals during prun in order
+// to not run out of memory and also to avoid losing all results if
+// failure after a long time.
+//spike2file() // old style in parlib.hoc, different prototype in spike2file.hoc
+//trajec_out("v")
+
+verifyHalfGap()
+
+{pc.runworker()}
+{getstat()}
+{print_spike_stat_info()}
+
+if (pc.id == 0) { printf("totaltime %g\n", startsw() - begintime) }
+if (pc.nhost > 1) {
+  pc.done()
+  quit()
+}

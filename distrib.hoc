@@ -1,0 +1,72 @@
+// since each cell is connected via gap junctions to its four neighbors
+// it makes sense to divide the network into blocks with each host
+// handling a separate block with as equal as possible the same number
+// of blocks in a row as in a column.
+// ie. balance would be perfect if nh2=sqrt(pc.nhost) is an integer (the
+// usual case) and also if Nx/nh2 and Ny/nh2 are both integers
+
+// But to get things working, for now try round-robin.
+// ie easy balance at the expense of excessive communication
+
+ncell = Nx*Ny
+iterator pcitr() {local i, gid
+	i = 0
+	for (gid = pc.id; gid < ncell; gid += pc.nhost) {
+		$&1 = gid
+		$&2 = i
+		iterator_statement
+		i += 1
+	}
+}
+
+// Here is the block implementation, keep the blocks roughly square
+// If we eventully use section connect in place of HalfGap as much
+// as possible then we would want the block to be as long as possible.
+     
+// There are pc.nhost blocks. Assume Nx, Ny, and nblock are powers of 2.
+// No attempt at optimality.
+// args: Nx, Ny, nblocks
+// output fills the global variables: Nx, Ny, nblock, ncell, ncellperlock,
+// blockNx, blockNy, xblock, yblock
+
+func is_power2() { local x
+	x = log($1)/log(2)
+	return x == int(x)
+}
+
+func blocksizes() {
+	Nx = $1
+	if (!is_power2(Nx)) return 0
+	Ny = $2
+	if (!is_power2(Ny)) return 0
+	nblock = $3
+	if (!is_power2(nblock)) return 0
+	ncell = Nx*Ny
+	ncellperblock = ncell/nblock
+	// Assume ncellperblock is a non-negative power of 2
+	// need blockNx * blockNy = ncellperblock
+	// with contraint that Nx/blockNx and Ny/blockNy are integers.
+	blockNy = 1
+	blockNx = ncellperblock/blockNy
+	for (blockNy = 1; Ny%blockNy == 0 ; blockNy *= 2) {
+		blockNx = ncellperblock/blockNy
+		if (Nx%blockNx != 0) { continue }
+		if (blockNy >= blockNx) { break }
+	}
+	return 1
+}
+
+if (block_distrib != 0) {
+	block_distrib = blocksizes(Nx, Ny, pc.nhost)
+	if (block_distrib) {
+		load_file("block_distrib.hoc") // replace iterator pcitr
+		if (pc.id == 0) {
+printf("Block gid distribution blockNx = %d  blockNy = %d\n", blockNx, blockNy)
+		}
+	}else{
+		if (pc.id == 0) {
+printf("One or more of Nx, Ny, rank is not a power of 2. Use round robin gid distribution\n")
+		}
+	}
+	pc.barrier()
+}

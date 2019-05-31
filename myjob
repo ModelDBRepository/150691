@@ -1,0 +1,10 @@
+#!/bin/bash
+
+#PBS -l nodes=4:ppn=8,walltime=00:3:00 -A std12-092 -N test-mh
+module load env/experimental
+
+export WORKDIR=/work/projects/std12-092/mm
+cd $WORKDIR
+pwd
+
+mpiexec -np 32 $WORKDIR/x86_64/special -mpi parinit.hoc

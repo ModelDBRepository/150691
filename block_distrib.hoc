@@ -1,0 +1,22 @@
+
+// the trick is to get gids spatially adjacent according to gidfunc.hoc
+// in the same block. Ie gid = x + y*Nx
+iterator pcitr() {local xb, yb, bx, by, x, y, k, gid
+	k = 0
+	xb = pc.id%(Nx/blockNx)
+	yb = int(pc.id/(Nx/blockNx))
+	for bx=0, blockNx-1 for by=0, blockNy-1 {
+		x = bx + xb*blockNx
+		y = by + yb*blockNy
+		gid = loc2gid(x, y)
+if (gid < 0) {
+printf("%d loc2gid(%d,%d)=%d xb=%d yb=%d bx=%d by=%d\n", pc.id, x,y,gid,\
+xb, yb, bx, by)
+}
+		$&1 = gid
+		$&2 = k
+		iterator_statement
+		k += 1
+	}
+}
+

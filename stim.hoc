@@ -1,0 +1,30 @@
+objref ms[nms], ms2
+
+// onto $1 ith row, $2 jth column cell
+obfunc mkstim() {local gid  localobj c, s, nil
+	gid = loc2gid($1, $2)
+	if (gid < 0) { return nil }
+	if (!pc.gid_exists(gid)) { return nil }
+	c = pc.gid2cell(gid)
+
+	c.soma { s = new NIClamp(.5) }
+	s.del = msdel
+	s.dur = msdur
+	s.amp = msamp
+	s.del1 = msdel1
+	s.n = msn
+	return s
+}
+
+for i=0, nms-1 {
+	ms[i] = mkstim(msrow, mscol+i)
+}
+
+ms2 = mkstim(ms2row, ms2col)
+if (object_id(ms2) != 0) {
+	ms2.del = ms2del
+	ms2.amp = ms2amp
+	ms2.dur = ms2dur
+	ms2.del1 = ms2del1
+	ms2.n = ms2n
+}

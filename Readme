@@ -1,0 +1,16 @@
+Casaleggio A, Hines ML, Migliore M (2014)
+Computational Model of Erratic Arrhythmias in a Cardiac Cell Network:
+The Role of Gap Junctions
+http://dx.plos.org/10.1371/journal.pone.0100288
+
+Models are run in parallel by, for example,
+mpiexec -n 4 nrniv -mpi parinit.hoc
+
+This will produce a spk000.dat file which can be sorted with
+sortspike spk000.dat spk.dat
+with the latter identical to spk.std .
+
+A movie of the spk.std file is seen with
+
+nrngui hinton.hoc
+p()

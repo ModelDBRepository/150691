@@ -1,0 +1,16 @@
+load_file("nrngui.hoc")
+objref pc
+pc = new ParallelContext()
+
+Nx=2
+Ny=1
+load_file("param.hoc")
+load_file("net1.hoc")
+load_file("verifygap.hoc")
+load_file("parlib.hoc")
+
+load_file("2cell.ses")
+
+//setgap(i, j, dir, gmin, gmax, rg, meant, rt, drift)
+setgap(0, 0, 0, 0, 30, 0, 1e9, 0, 0)
+

@@ -1,0 +1,8 @@
+{load_file("nrngui.hoc")}
+objref pc
+pc = new ParallelContext()
+{load_file("param.hoc")}
+{load_file("cell.hoc")}
+objref cell
+cell = new Cell()
+{load_file("single.ses")}

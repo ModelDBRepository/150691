@@ -1,0 +1,40 @@
+load_file("nrngui.hoc")
+objref b,g, infile, outfile, sp1,sp2, sp3, count
+
+sp1=new Vector()
+sp2=new Vector()
+sp3=new Vector()
+count=new Vector()
+
+number=50
+low=2000
+high=low+number
+b = new VBox()
+b.intercept(1)
+g = new Graph()
+g.size(0,10000,low,low+number)
+g.xaxis(1)
+xpanel("")
+xbutton("run ", "runm()")
+xpanel()
+b.intercept(0)
+b.map()
+g.begin()
+
+proc runm() {
+high=low+number
+g.erase()
+g.size(0,10000,low,low+number)
+g.xaxis(1)
+infile = new File()
+infile.ropen("bl_g8.spk")
+while (!infile.eof()) {
+	time = infile.scanvar()
+	index = infile.scanvar()
+	if (index>low && index<high) {
+		g.mark(time,index+1,"|",10,index+1,2)
+	}
+}
+infile.close()
+}
+

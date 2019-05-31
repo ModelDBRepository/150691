@@ -1,0 +1,29 @@
+objref pc
+pc = new ParallelContext()
+{load_file("nrngui.hoc")}
+{load_file("param.hoc")}
+
+cvode.active(1)
+
+{load_file("net1.hoc")}
+//{load_file("bl2-gvar.hoc")}
+
+event_HalfGap = 1e9
+for yy=5, 15 {
+	for dd=0, 3 {
+		setgap(5, yy, dd, 0, 0)
+	}
+}
+{load_file("stim.hoc")}
+{load_file("parlib.hoc")}
+want_all_spikes()
+
+if (pc.nhost > 1) {
+  pc.runworker()
+  pc.done()
+  quit()
+}
+
+//load_file("prova.ses")
+
+
