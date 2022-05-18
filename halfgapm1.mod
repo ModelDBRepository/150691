@@ -109,15 +109,20 @@ NET_RECEIVE (w) {
 : with the global variable time step method.
 
 VERBATIM
+#ifndef NRN_VERSION_GTEQ_8_2_0
 double nrn_random_pick(void* r); 
 void* nrn_random_arg(int argpos);
+#define RANDCAST
+#else
+#define RANDCAST (Rand*)
+#endif
 ENDVERBATIM
 
 
 FUNCTION mynormrand(mean, var) {
 VERBATIM
 	if (_p_donotuse) {
-		double x = nrn_random_pick(_p_donotuse);
+		double x = nrn_random_pick(RANDCAST _p_donotuse);
 		_lmynormrand = x*_lvar + _lmean;
 	}else{
 		_lmynormrand = _lmean;

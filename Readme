@@ -14,3 +14,9 @@ A movie of the spk.std file is seen with
 
 nrngui hinton.hoc
 p()
+
+
+Update
+------
+
+MOD files compatibility fixes for upcoming NEURON 9.0, 8.2 and 8.1
